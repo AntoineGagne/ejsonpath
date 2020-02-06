@@ -14,13 +14,13 @@ buildpath_test() ->
 type_test() ->
     % array
     ?assertEqual(array, ejsonpath_common:type([])),
-    ?assertEqual(array, ejsonpath_common:type([1,2,3])),
+    ?assertEqual(array, ejsonpath_common:type([1, 2, 3])),
     ?assertEqual(array, ejsonpath_common:type("xyz")),
-    
+
     % hash
     ?assertEqual(hash, ejsonpath_common:type(#{})),
     ?assertEqual(hash, ejsonpath_common:type(#{ <<"x">> => 1})),
-    
+
     % string
     ?assertEqual(string, ejsonpath_common:type(<<>>)),
     ?assertEqual(string, ejsonpath_common:type(xyz)),
@@ -29,14 +29,14 @@ type_test() ->
     % number
     ?assertEqual(number, ejsonpath_common:type(0)),
     ?assertEqual(number, ejsonpath_common:type(0.0)),
-    
+
     % boolean
     ?assertEqual(boolean, ejsonpath_common:type(true)),
     ?assertEqual(boolean, ejsonpath_common:type(false)),
-    
+
     % null
     ?assertEqual(null, ejsonpath_common:type(null)),
-    
+
     ok.
 
 index_test() ->
@@ -58,17 +58,17 @@ insert_list_test() ->
 
     ?assertEqual([x], ejsonpath_common:insert_list(1, x, [a])),
 
-    ?assertEqual([x,y,z], ejsonpath_common:insert_list(1, x, [a,y,z])),
-    ?assertEqual([x,y,z], ejsonpath_common:insert_list(2, y, [x,a,z])),
-    ?assertEqual([x,y,z], ejsonpath_common:insert_list(3, z, [x,y,a])),
-    
+    ?assertEqual([x, y, z], ejsonpath_common:insert_list(1, x, [a, y, z])),
+    ?assertEqual([x, y, z], ejsonpath_common:insert_list(2, y, [x, a, z])),
+    ?assertEqual([x, y, z], ejsonpath_common:insert_list(3, z, [x, y, a])),
+
     ok.
 
 slice_seq_test() ->
     ?assertEqual({error, badarg}, ejsonpath_common:slice_seq(0, 0, 0, 0)),
     ?assertEqual({error, badarg}, ejsonpath_common:slice_seq(0, 0, 0, -1)),
     ?assertEqual({error, badarg}, ejsonpath_common:slice_seq(0, 0, -1, 0)),
-    
+
     ?assertEqual([], ejsonpath_common:slice_seq(0, 0, 1, 3)),
     ?assertEqual([0], ejsonpath_common:slice_seq(0, 1, 1, 3)),
     ?assertEqual([0, 1, 2], ejsonpath_common:slice_seq(0, 3, 1, 3)),
@@ -78,6 +78,6 @@ slice_seq_test() ->
 
     ?assertEqual([], ejsonpath_common:slice_seq(10, 10, 1, 4)),
     ?assertEqual([], ejsonpath_common:slice_seq(10, -1, 1, 3)),
-    ?assertEqual([0,1,2], ejsonpath_common:slice_seq(0, 10, 1, 3)),
+    ?assertEqual([0, 1, 2], ejsonpath_common:slice_seq(0, 10, 1, 3)),
 
     ok.
