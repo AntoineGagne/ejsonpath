@@ -1,4 +1,3 @@
-%%% Copyright 2013 Sergey Prokhorov
 %%%
 %%% Licensed under the Apache License, Version 2.0 (the "License");
 %%% you may not use this file except in compliance with the License.
@@ -11,9 +10,14 @@
 %%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %%% See the License for the specific language governing permissions and
 %%% limitations under the License.
-
+%%%
+%%% ---------------------------------------------------------
+%%% @doc
+%%% Pure Erlang implementation of JSONPath.
+%%% @copyright 2013 Sergey Prokhorov
 %%% @author Sergey Prokhorov <me@seriyps.ru>
-%%% Created : 12 Aug 2013 by Sergey Prokhorov <me@seriyps.ru>
+%%% @end
+%%% ---------------------------------------------------------
 
 -module(ejsonpath).
 
@@ -24,10 +28,15 @@
 -export([q/2, q/3, q/4]).
 -export([tr/3, tr/4, tr/5]).
 
--export([execute/2, execute/3]).
--deprecated([execute/2, execute/3]).
+-export([execute/2,
+         execute/3]).
 
--export_type([json_node/0, jsonpath_funcspecs/0, jsonpath_func/0]).
+-deprecated([execute/2,
+             execute/3]).
+
+-export_type([json_node/0,
+              jsonpath_funcspecs/0,
+              jsonpath_func/0]).
 
 -type jsonpath() :: string().
 -type json_node() 
@@ -52,6 +61,21 @@
     :: fun( ( { CurrentNode :: json_node(), RootNode :: json_node()}, Args :: [any()] ) ->
     Return :: boolean() ).
 
+-type jsonpath_tr_result() :: {ok, json_node()}
+                            | {error, any()}
+                            | delete.
+
+-type jsonpath_tr_node() :: #{ type => atom(), node => json_node(), path => string()}.
+-type jsonpath_tr_func() :: 
+    fun ( ({match, jsonpath_tr_node()}) 
+        -> jsonpath_tr_result() ) 
+    | fun ( ({not_found, Path :: string(), Key :: string() | number(), jsonpath_tr_node()}) 
+        -> jsonpath_tr_result() ).
+
+
+%%%===================================================================
+%%% API
+%%%===================================================================
 
 q(Query, Root) ->
     q(Query, Root, #{}, []).
@@ -59,7 +83,6 @@ q(Query, Root, Functions) ->
     q(Query, Root, Functions, []).
 
 -spec q(jsonpath(), json_node(), jsonpath_funcspecs(), [any()]) -> {[json_node()], [string()]}.
-
 q(Query, Root, Functions, Options) ->
     {ok, Tokens, _} = ejsonpath_scan:string(Query),
     {ok, Tree}      = ejsonpath_parse:parse(Tokens),
@@ -79,23 +102,18 @@ execute(Query, Root, Functions) ->
     {Result, _Paths} = q(Query, Root, Functions, []),
     Result.
 
--type jsonpath_tr_result() :: {ok, json_node()}
-                            | {error, any()}
-                            | delete.
-
--type jsonpath_tr_node() :: #{ type => atom(), node => json_node(), path => string()}.
--type jsonpath_tr_func() :: 
-    fun ( ({match, jsonpath_tr_node()}) 
-        -> jsonpath_tr_result() ) 
-    | fun ( ({not_found, Path :: string(), Key :: string() | number(), jsonpath_tr_node()}) 
-        -> jsonpath_tr_result() ).
-
--spec tr(jsonpath(), json_node(), jsonpath_tr_func(), jsonpath_funcspecs(), [any()]) -> {json_node(), [string()]}.
-
+-spec tr(jsonpath(), json_node(), jsonpath_tr_func()) ->
+    {json_node(), [string()]}.
 tr(Query, Root, Transform) ->
     tr(Query, Root, Transform, #{}, []).
+
+-spec tr(jsonpath(), json_node(), jsonpath_tr_func(), jsonpath_funcspecs()) ->
+    {json_node(), [string()]}.
 tr(Query, Root, Transform, Functions) ->
     tr(Query, Root, Transform, Functions, []).
+
+-spec tr(jsonpath(), json_node(), jsonpath_tr_func(), jsonpath_funcspecs(), [any()]) ->
+    {json_node(), [string()]}.
 tr(Query, Root, Transform, Functions, Options) ->
     {ok, Tokens, _} = ejsonpath_scan:string(Query),
     {ok, Tree}      = ejsonpath_parse:parse(Tokens),
