@@ -23,16 +23,16 @@ eval({root, Predicates}, Node, Funcs, Options) ->
         opts => Options,
         funcs => Funcs,
 
-        eval_root => fun (SubQuery) -> 
+        eval_root => fun (SubQuery) ->
             eval(SubQuery, Node, Funcs, Options)
         end,
-        eval_step => fun (SubQuery, CurrNode, Ctx) -> 
+        eval_step => fun (SubQuery, CurrNode, Ctx) ->
             eval_step(SubQuery, [CurrNode], Ctx)
         end
     },
     eval_step(Predicates, [argument(Node, "$")], Context).
 
-eval_step([{Children, {predicate, Predicate}} | Rest], Result, Cxt) -> 
+eval_step([{Children, {predicate, Predicate}} | Rest], Result, Cxt) ->
     ?EJSONPATH_LOG({enter, Predicate}),
     NewResult = lists:foldl(
         fun (Arg, Acc) ->
@@ -52,7 +52,7 @@ apply_eval({key, '*'}, #argument{type = array, node = Node} = Arg, Ctx) ->
     ?EJSONPATH_LOG({key, array, '*'}),
     Idxs = lists:seq(0, erlang:length(Node)-1),
     apply_eval({access_list, Idxs}, Arg, Ctx);
-apply_eval({key, Key}, #argument{type = hash} = Arg, Ctx) -> 
+apply_eval({key, Key}, #argument{type = hash} = Arg, Ctx) ->
     ?EJSONPATH_LOG({key, Key}),
     apply_eval({access_list, [Key]}, Arg, Ctx);
 apply_eval({key, _}, _, _) ->
@@ -60,7 +60,7 @@ apply_eval({key, _}, _, _) ->
 % {access_list, KeysOrIdxs}
 apply_eval({access_list, Idxs}, #argument{type = array, node = Node, path = Path}, _) ->
     ?EJSONPATH_LOG({access_list, array, Idxs, Path}),
-    lists:reverse(lists:foldl(fun (Idx0, Acc) -> 
+    lists:reverse(lists:foldl(fun (Idx0, Acc) ->
         case ejsonpath_common:index(Idx0, erlang:length(Node)) of
             {error, _} -> Acc;
             {ok, Idx} -> [argument(lists:nth(Idx, Node), Path, Idx-1)|Acc]
@@ -68,7 +68,7 @@ apply_eval({access_list, Idxs}, #argument{type = array, node = Node, path = Path
     end, [], Idxs));
 apply_eval({access_list, Keys}, #argument{type = hash, node = Node, path = Path}, _) ->
     ?EJSONPATH_LOG({access_list, hash, Keys, Path}),
-    lists:reverse(lists:foldl(fun (Key, Acc) -> 
+    lists:reverse(lists:foldl(fun (Key, Acc) ->
         case maps:get(Key, Node, '$undefined') of
             '$undefined' -> Acc;
             Child -> [argument(Child, Path, Key)|Acc]
@@ -78,7 +78,7 @@ apply_eval({access_list, Keys}, #argument{type = hash, node = Node, path = Path}
 % {filter_expr, Script}
 apply_eval({filter_expr, Script}, #argument{type = hash, node = Node, path = Path} = Arg, Ctx) ->
     ?EJSONPATH_LOG({filter_expr, hash, Script}),
-    Keys = lists:reverse(maps:fold(fun (Key, Value, Acc) -> 
+    Keys = lists:reverse(maps:fold(fun (Key, Value, Acc) ->
         case ejsonpath_common:to_boolean(script_eval(Script, argument(Value, Path, Key), Ctx)) of
             false -> Acc;
             _ -> [Key|Acc]
@@ -104,7 +104,7 @@ apply_eval({filter_expr, Script}, #argument{} = Arg, Ctx) ->
 %% {transform_expr, Script}
 apply_eval({transform_expr, Script}, #argument{type = hash, node = Node, path = Path}, Ctx) ->
     ?EJSONPATH_LOG({transform_expr, hash, Path, Script}),
-    lists:reverse(maps:fold(fun (Key, Value, Acc) -> 
+    lists:reverse(maps:fold(fun (Key, Value, Acc) ->
         Result = script_eval(Script, argument(Value, Path, Key), Ctx),
         [ argument(Result, Path, Key) | Acc ]
     end, [], Node));
@@ -136,15 +136,15 @@ children(child, Nodes) -> Nodes;
 children(descendant, Nodes) ->
     children_i(Nodes, []).
 
-children_i([], Acc) -> 
+children_i([], Acc) ->
     Acc;
 children_i([#argument{type = array, node = Node, path = Path } = Arg | Rest], Acc) ->
-    {_, AddAcc} = lists:foldl(fun (Child, {Idx, InnerAcc}) -> 
+    {_, AddAcc} = lists:foldl(fun (Child, {Idx, InnerAcc}) ->
         {Idx+1, InnerAcc ++ children_i([argument(Child, Path, Idx)], [])}
     end, {0, []}, Node),
     children_i(Rest, Acc ++ [Arg] ++ AddAcc);
 children_i([#argument{type = hash, node = Node, path = Path} = Arg | Rest], Acc) ->
-    AddAcc = maps:fold(fun (Key, Child, InnerAcc) -> 
+    AddAcc = maps:fold(fun (Key, Child, InnerAcc) ->
         InnerAcc ++ children_i([argument(Child, Path, Key)], [])
     end, [], Node),
     children_i(Rest, Acc ++ [Arg] ++ AddAcc);

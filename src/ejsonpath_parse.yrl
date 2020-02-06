@@ -20,7 +20,7 @@
 %% $.store.book.*.category
 
 %% { "store": {
-%%     "book": [ 
+%%     "book": [
 %%       { "category": "reference",
 %%         "author": "Nigel Rees",
 %%         "title": "Sayings of the Century",
@@ -55,7 +55,7 @@ Nonterminals
 expr
 axis steps step
 predicate key_predicate
-access_list 
+access_list
 filter_expr transform_expr
 slice
 script function_call function_args function_argument
@@ -63,11 +63,11 @@ operand bin_operator sint
 .
 
 Terminals
-'$' '..' '.' '*' 
-'[' ']' ',' ':' 
+'$' '..' '.' '*'
+'[' ']' ',' ':'
 '?' '(' ')'
-'+' '/' '-' 
-'@' '==' '!=' '<' '>' '&&' '||' 
+'+' '/' '-'
+'@' '==' '!=' '<' '>' '&&' '||'
 string key int
 .
 

@@ -39,7 +39,7 @@ argument(Node, ParentPath, Key) ->
         path = ejsonpath_common:buildpath(Key, ParentPath)
     }.
 
-unzip(L) when is_list(L) -> 
+unzip(L) when is_list(L) ->
     unzip_i(L, {[], []}).
 unzip_i([], {Acc0, Acc1}) ->
     {lists:reverse(Acc0), lists:reverse(Acc1)};
@@ -73,13 +73,13 @@ slice_seq(_, _, _, _) ->
 
 slice_seq_i(Start, '$end', Step, Sz) ->
     slice_seq_i(Start, Sz, Step, Sz);
-slice_seq_i(Start, End, Step, Sz) 
+slice_seq_i(Start, End, Step, Sz)
     when Start < 0 ->
     slice_seq_i(max(Sz+Start, 0), End, Step, Sz);
-slice_seq_i(Start, End, Step, Sz) 
+slice_seq_i(Start, End, Step, Sz)
     when End < 0 ->
     slice_seq_i(Start, min(Sz+End, Sz), Step, Sz);
-slice_seq_i(Start, End, Step, Sz) 
+slice_seq_i(Start, End, Step, Sz)
     when (Start >= 0) andalso (End >= 0) ->
 
     % range: [S, E)
@@ -90,8 +90,8 @@ slice_seq_i(_, _, _, _) ->
     {error, badarg}.
 
 insert_list_i(Idx, Value, List) ->
-    lists:sublist(List, Idx-1) ++ 
-    [ Value ] ++ 
+    lists:sublist(List, Idx-1) ++
+    [ Value ] ++
     lists:nthtail(Idx, List).
 index(N, Sz) when is_number(N), N >= 0 ->
     index_i(N+1, Sz);
@@ -101,12 +101,12 @@ index(_, _) ->
     {error, badarg}.
 index_i(N, Sz) when N > 0, N =< Sz ->
     {ok, N};
-index_i(_,_) ->
+index_i(_, _) ->
     {error, badarg}.
 
 script_eval({op, _} = Op, Arg, Ctx) ->
     op_eval(Op, Arg, Ctx);
-script_eval({function_call, Name, Args}, #argument{node = Node}, #{funcs := Funcs, root := Root}) -> 
+script_eval({function_call, Name, Args}, #argument{node = Node}, #{funcs := Funcs, root := Root}) ->
     Func = maps:get(Name, Funcs),
     Func({Node, Root}, Args);
 script_eval({bin_op, '==', L, R}, Arg = #argument{}, Ctx) ->
