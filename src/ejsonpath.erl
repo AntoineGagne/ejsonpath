@@ -39,7 +39,7 @@
               jsonpath_func/0]).
 
 -type jsonpath() :: string().
--type json_node() 
+-type json_node()
     :: null                        % null
     | boolean()                    % true/false
     | binary()                     % string
@@ -47,17 +47,17 @@
     | [json_node()]                % array
     | #{binary() => json_node()}.  % hash (object)
 
--type jsonpath_funcspecs() :: #{ Name :: atom() => Fun :: jsonpath_func() }.
+-type jsonpath_funcspecs() :: #{ Name :: atom() => Fun :: jsonpath_func()}.
 
--type jsonpath_func() 
-    :: jsonpath_transform_func() 
+-type jsonpath_func()
+    :: jsonpath_transform_func()
     | jsonpath_filter_func().
 
--type jsonpath_transform_func() 
+-type jsonpath_transform_func()
     :: fun( ({CurrentNode :: json_node(), RootNode :: json_node()}, Args :: [any()] ) ->
     Return :: json_node() ).
 
--type jsonpath_filter_func() 
+-type jsonpath_filter_func()
     :: fun( ( { CurrentNode :: json_node(), RootNode :: json_node()}, Args :: [any()] ) ->
     Return :: boolean() ).
 
@@ -66,10 +66,10 @@
                             | delete.
 
 -type jsonpath_tr_node() :: #{ type => atom(), node => json_node(), path => string()}.
--type jsonpath_tr_func() :: 
-    fun ( ({match, jsonpath_tr_node()}) 
-        -> jsonpath_tr_result() ) 
-    | fun ( ({not_found, Path :: string(), Key :: string() | number(), jsonpath_tr_node()}) 
+-type jsonpath_tr_func() ::
+    fun ( ({match, jsonpath_tr_node()})
+        -> jsonpath_tr_result() )
+    | fun ( ({not_found, Path :: string(), Key :: string() | number(), jsonpath_tr_node()})
         -> jsonpath_tr_result() ).
 
 
