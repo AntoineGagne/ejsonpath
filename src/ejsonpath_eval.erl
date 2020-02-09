@@ -5,39 +5,31 @@
 -endif.
 
 % -define(EJSONPATH_DEBUG, true).
--include("./ejsonpath.hrl").
--import(ejsonpath_common, [argument/2, argument/3, script_eval/3]).
+-include("src/ejsonpath.hrl").
 
--export([
-    eval/4,
-    eval_step/3
-]).
+-export([eval/4,
+         eval_step/3]).
 
 eval({root, '$'}, Node, _, _) ->
     {[Node], ["$"]};
 eval({root, Descendant}, Node, _, _) when is_atom(Descendant) ->
-    ejsonpath_common:unzip(children(Descendant, [argument(Node, "$")]));
+    Children = children(Descendant, [ejsonpath_common:argument(Node, "$")]),
+    ejsonpath_common:unzip(Children);
 eval({root, Predicates}, Node, Funcs, Options) ->
-    Context = #{
-        root => Node,
-        opts => Options,
-        funcs => Funcs,
-
-        eval_root => fun (SubQuery) ->
-            eval(SubQuery, Node, Funcs, Options)
-        end,
-        eval_step => fun (SubQuery, CurrNode, Ctx) ->
-            eval_step(SubQuery, [CurrNode], Ctx)
-        end
-    },
-    eval_step(Predicates, [argument(Node, "$")], Context).
+    EvalStep = fun (SubQuery, CurrNode, Ctx) -> eval_step(SubQuery, [CurrNode], Ctx) end,
+    Context = #{root => Node,
+                opts => Options,
+                funcs => Funcs,
+                eval_root => fun (SubQuery) -> eval(SubQuery, Node, Funcs, Options) end,
+                eval_step => EvalStep},
+    eval_step(Predicates, [ejsonpath_common:argument(Node, "$")], Context).
 
 eval_step([{Children, {predicate, Predicate}} | Rest], Result, Cxt) ->
     ?EJSONPATH_LOG({enter, Predicate}),
     NewResult = lists:foldl(
-        fun (Arg, Acc) ->
-            Acc ++ apply_eval(Predicate, Arg, Cxt)
-        end, [], children(Children, Result)),
+                  fun (Arg, Acc) ->
+                          Acc ++ apply_eval(Predicate, Arg, Cxt)
+                  end, [], children(Children, Result)),
     eval_step(Rest, NewResult, Cxt);
 eval_step([], Result, _) -> ejsonpath_common:unzip(Result);
 eval_step(_, _, _) ->
@@ -60,43 +52,54 @@ apply_eval({key, _}, _, _) ->
 % {access_list, KeysOrIdxs}
 apply_eval({access_list, Idxs}, #argument{type = array, node = Node, path = Path}, _) ->
     ?EJSONPATH_LOG({access_list, array, Idxs, Path}),
-    lists:reverse(lists:foldl(fun (Idx0, Acc) ->
-        case ejsonpath_common:index(Idx0, erlang:length(Node)) of
-            {error, _} -> Acc;
-            {ok, Idx} -> [argument(lists:nth(Idx, Node), Path, Idx-1)|Acc]
-        end
-    end, [], Idxs));
+    Fun = fun (Idx0, Acc) ->
+                  case ejsonpath_common:index(Idx0, erlang:length(Node)) of
+                      {error, _} -> Acc;
+                      {ok, Idx} ->
+                          NodeAtIdx = lists:nth(Idx, Node),
+                          Argument = ejsonpath_common:argument(NodeAtIdx, Path, Idx - 1),
+                          [Argument | Acc]
+                  end
+          end,
+    lists:reverse(lists:foldl(Fun, [], Idxs));
 apply_eval({access_list, Keys}, #argument{type = hash, node = Node, path = Path}, _) ->
     ?EJSONPATH_LOG({access_list, hash, Keys, Path}),
-    lists:reverse(lists:foldl(fun (Key, Acc) ->
-        case maps:get(Key, Node, '$undefined') of
-            '$undefined' -> Acc;
-            Child -> [argument(Child, Path, Key)|Acc]
-        end
-    end, [], Keys));
+    Fun = fun (Key, Acc) ->
+                  case maps:get(Key, Node, '$undefined') of
+                      '$undefined' -> Acc;
+                      Child -> [ejsonpath_common:argument(Child, Path, Key)|Acc]
+                  end
+          end,
+    lists:reverse(lists:foldl(Fun, [], Keys));
 
 % {filter_expr, Script}
 apply_eval({filter_expr, Script}, #argument{type = hash, node = Node, path = Path} = Arg, Ctx) ->
     ?EJSONPATH_LOG({filter_expr, hash, Script}),
-    Keys = lists:reverse(maps:fold(fun (Key, Value, Acc) ->
-        case ejsonpath_common:to_boolean(script_eval(Script, argument(Value, Path, Key), Ctx)) of
-            false -> Acc;
-            _ -> [Key|Acc]
-        end
-    end, [], Node)),
+    Fun = fun (Key, Value, Acc) ->
+                  Argument = ejsonpath_common:argument(Value, Path, Key),
+                  Evaluated = ejsonpath_common:script_eval(Script, Argument, Ctx),
+                  case ejsonpath_common:to_boolean(Evaluated) of
+                      false -> Acc;
+                      _ -> [Key|Acc]
+                  end
+          end,
+    Keys = lists:reverse(maps:fold(Fun, [], Node)),
     apply_eval({access_list, Keys}, Arg, Ctx);
 apply_eval({filter_expr, Script}, #argument{type = array, node = Node, path = Path} = Arg, Ctx) ->
     ?EJSONPATH_LOG({filter_expr, array, Script}),
-    {_, Idxs} = lists:foldl(fun (Item, {Idx, Acc}) ->
-        case ejsonpath_common:to_boolean(script_eval(Script, argument(Item, Path, Idx), Ctx)) of
-            false -> {Idx+1, Acc};
-            _ -> {Idx+1, [Idx|Acc]}
-        end
-    end, {0, []}, Node),
+    Fun = fun (Item, {Idx, Acc}) ->
+                  Argument = ejsonpath_common:argument(Item, Path, Idx),
+                  Evaluated = ejsonpath_common:script_eval(Script, Argument, Ctx),
+                  case ejsonpath_common:to_boolean(Evaluated) of
+                      false -> {Idx+1, Acc};
+                      _ -> {Idx+1, [Idx|Acc]}
+                  end
+          end,
+    {_, Idxs} = lists:foldl(Fun, {0, []}, Node),
     apply_eval({access_list, lists:reverse(Idxs)}, Arg, Ctx);
 apply_eval({filter_expr, Script}, #argument{} = Arg, Ctx) ->
     ?EJSONPATH_LOG({filter_expr, Script}),
-    case ejsonpath_common:to_boolean(script_eval(Script, Arg, Ctx)) of
+    case ejsonpath_common:to_boolean(ejsonpath_common:script_eval(Script, Arg, Ctx)) of
         false -> [];
         _ -> [Arg]
     end;
@@ -104,20 +107,24 @@ apply_eval({filter_expr, Script}, #argument{} = Arg, Ctx) ->
 %% {transform_expr, Script}
 apply_eval({transform_expr, Script}, #argument{type = hash, node = Node, path = Path}, Ctx) ->
     ?EJSONPATH_LOG({transform_expr, hash, Path, Script}),
-    lists:reverse(maps:fold(fun (Key, Value, Acc) ->
-        Result = script_eval(Script, argument(Value, Path, Key), Ctx),
-        [ argument(Result, Path, Key) | Acc ]
-    end, [], Node));
+    Fun = fun (Key, Value, Acc) ->
+                  Argument = ejsonpath_common:argument(Value, Path, Key),
+                  Result = ejsonpath_common:script_eval(Script, Argument, Ctx),
+                  [ejsonpath_common:argument(Result, Path, Key) | Acc]
+          end,
+    lists:reverse(maps:fold(Fun, [], Node));
 apply_eval({transform_expr, Script}, #argument{type = array, node = Node, path = Path}, Ctx) ->
     ?EJSONPATH_LOG({transform_expr, array, Path, Script}),
-    {_, NewNode} = lists:foldl(fun (Item, {Idx, Acc}) ->
-        Result = script_eval(Script, argument(Item, Path, Idx), Ctx),
-        [ argument(Result, Path, Idx) | Acc ]
-    end, {0, []}, Node),
+    Fun = fun (Item, {Idx, Acc}) ->
+                  Argument = ejsonpath_common:argument(Item, Path, Idx),
+                  Result = ejsonpath_common:script_eval(Script, Argument, Ctx),
+                  [ejsonpath_common:argument(Result, Path, Idx) | Acc ]
+          end,
+    {_, NewNode} = lists:foldl(Fun, {0, []}, Node),
     lists:reverse(NewNode);
 apply_eval({transform_expr, Script}, #argument{path = Path} = Arg, Ctx) ->
     ?EJSONPATH_LOG({transform_expr, array, Path, Script}),
-    Result = script_eval(Script, Arg, Ctx),
+    Result = ejsonpath_common:script_eval(Script, Arg, Ctx),
     [#argument{type = ejsonpath_common:type(Result), node = Result, path = Path}];
 
 %% {slice, S, E, Step}
@@ -139,14 +146,18 @@ children(descendant, Nodes) ->
 children_i([], Acc) ->
     Acc;
 children_i([#argument{type = array, node = Node, path = Path } = Arg | Rest], Acc) ->
-    {_, AddAcc} = lists:foldl(fun (Child, {Idx, InnerAcc}) ->
-        {Idx+1, InnerAcc ++ children_i([argument(Child, Path, Idx)], [])}
-    end, {0, []}, Node),
+    Fun = fun (Child, {Idx, InnerAcc}) ->
+                  Argument = ejsonpath_common:argument(Child, Path, Idx),
+                  {Idx + 1, InnerAcc ++ children_i([Argument], [])}
+          end,
+    {_, AddAcc} = lists:foldl(Fun, {0, []}, Node),
     children_i(Rest, Acc ++ [Arg] ++ AddAcc);
 children_i([#argument{type = hash, node = Node, path = Path} = Arg | Rest], Acc) ->
-    AddAcc = maps:fold(fun (Key, Child, InnerAcc) ->
-        InnerAcc ++ children_i([argument(Child, Path, Key)], [])
-    end, [], Node),
+    Fun = fun (Key, Child, InnerAcc) ->
+                  Argument = ejsonpath_common:argument(Child, Path, Key),
+                  InnerAcc ++ children_i([Argument], [])
+          end,
+    AddAcc = maps:fold(Fun, [], Node),
     children_i(Rest, Acc ++ [Arg] ++ AddAcc);
 children_i([Arg = #argument{}| Rest], Acc) ->
     children_i(Rest, Acc ++ [Arg]).
